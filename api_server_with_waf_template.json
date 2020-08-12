@@ -12,13 +12,22 @@
     },
 
     "InstanceType" : {
-      "Description" : "WebServer EC2 instance type",
+      "Description" : "Petstore EC2 instance type",
       "Type" : "String",
       "Default" : "m4.large",
       "AllowedValues" : [ "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge"]
 ,
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
+    "WAFInstanceType" : {
+      "Description" : "Barracuda WAF EC2 instance type",
+      "Type" : "String",
+      "Default" : "m4.large",
+      "AllowedValues" : [ "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge"]
+,
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
 
     "SSHLocation": {
       "Description": "The IP address range that can be used to SSH to the EC2 instances",
@@ -71,19 +80,21 @@
       "m4.xlarge"   : { "Arch" : "HVM64"  }
       
     },
-
-    "BackendAWSInstanceType2NATArch" : {
-      "m3.large"    : { "Arch" : "NATHVM64"  },
-      "m3.xlarge"   : { "Arch" : "NATHVM64"  },
-      "m3.2xlarge"  : { "Arch" : "NATHVM64"  },
-      "m4.large"    : { "Arch" : "NATHVM64"  },
-      "m4.xlarge"   : { "Arch" : "NATHVM64"  }
-      
-    },
     "BackendAWSRegionArch2AMI" : {
       "us-west-2"        : {"HVM64" : "ami-0873b46c45c11058d"},
-      "us-west-1"        : {"HVM64" : "ami-05655c267c89566dd"}
+      "us-west-1"        : {"HVM64" : "ami-05655c267c89566dd"}  
+    },
+    "WAFAWSInstanceType2Arch" : {
       
+      "m3.large"    : { "Arch" : "HVM64"  },
+      "m3.xlarge"   : { "Arch" : "HVM64"  },
+      "m3.2xlarge"  : { "Arch" : "HVM64"  },
+      "m4.large"    : { "Arch" : "HVM64"  },
+      "m4.xlarge"   : { "Arch" : "HVM64"  }   
+    },
+    "WAFAWSRegionArch2AMI" : {
+      "us-west-2"        : {"HVM64" : "ami-0fcb0e67ba0ebe5dc"},
+      "us-west-1"        : {"HVM64" : "ami-0892ee615afca4c0b"}  
     }
 
   },
@@ -99,7 +110,20 @@
         ]
       }
     },
-
+    "WAFSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP access via port 8080 + SSH access",
+        "SecurityGroupIngress" : [
+          {"IpProtocol" : "tcp", "FromPort" : "8000", "ToPort" : "8000", "CidrIp" : "0.0.0.0/0"},
+          {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+          {"IpProtocol" : "tcp", "FromPort" : "8080", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+          {"IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0"}
+          
+        ]
+      }
+    },
+    
     "WebServer": {
       "Type" : "AWS::EC2::Instance",
       "Metadata" : {
@@ -198,6 +222,9 @@
         "InstanceType"   : { "Ref" : "InstanceType" },
         "SecurityGroups" : [ {"Ref" : "WebServerSecurityGroup"} ],
         "KeyName"        : { "Ref" : "KeyName" },
+        "Tags": [
+          {   "Key": "Name",
+              "Value": "API_Server"}],
         "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
                        "#!/bin/bash -xe\n",
                        "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1\n",
@@ -228,6 +255,19 @@
         "ResourceSignal" : {
           "Timeout" : "PT15M"
         }
+      }
+    },
+    "BarracudaWAF": {
+      "Type" : "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId" : { "Fn::FindInMap" : [ "WAFAWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                          { "Fn::FindInMap" : [ "WAFAWSInstanceType2Arch", { "Ref" : "WAFInstanceType" }, "Arch" ] } ] },
+        "InstanceType"   : { "Ref" : "WAFInstanceType" },
+        "SecurityGroups" : [ {"Ref" : "WAFSecurityGroup"} ],
+        "Tags": [
+          {   "Key": "Name",
+              "Value": "BarracudaWAF"}],
+        "KeyName"        : { "Ref" : "KeyName" } 
       }
     }
   },
