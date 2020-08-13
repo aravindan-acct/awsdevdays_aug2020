@@ -40,9 +40,7 @@
       "Description" : "BarracudaWAF admin password",
       "Type": "String",
       "MinLength": "8",
-      "MaxLength": "41",
-      "AllowedPattern" : "[a-zA-Z0-9]*",
-      "ConstraintDescription" : "must contain only alphanumeric characters."
+      "MaxLength": "41"
     },
     "SSHLocation": {
       "Description": "The IP address range that can be used to SSH to the EC2 instances",
@@ -152,12 +150,13 @@
               "Value": "FrontEnd_Server"}],
         "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
                        "#!/bin/bash -xe\n",
+                       "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1\n",
                        "yum update -y aws-cfn-bootstrap\n",
 
                        "/opt/aws/bin/cfn-init -v ",
                        "         --stack ", { "Ref" : "AWS::StackName" },
                        "         --resource WebServer ",
-                       "         --configsets wordpress_install ",
+                       "         --configsets petstore_install ",
                        "         --region ", { "Ref" : "AWS::Region" }, "\n",
 
                        "/opt/aws/bin/cfn-signal -e $? ",
