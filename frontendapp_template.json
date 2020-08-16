@@ -15,7 +15,7 @@
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
       "Default" : "m4.large",
-      "AllowedValues" : [ "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge"]
+      "AllowedValues" : [ "t2.medium", "m3.large", "m4.large"]
 ,
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
