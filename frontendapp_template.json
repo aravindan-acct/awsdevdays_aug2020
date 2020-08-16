@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "AWS CloudFormation Sample Template PetStore_Single_Instance: PetStore is web software you can use to demo an API server with a frontend application. This template installs PetStore with a local MySQL database for storage. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.",
+  "Description" : "AWS CloudFormation Sample Template PetStore_Single_Instance: PetStore is web software you can use to demo an API server with a frontend application. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.",
 
   "Parameters" : {
 
@@ -182,8 +182,8 @@
 
   "Outputs" : {
     "WebsiteURL" : {
-      "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : [ "WebServer", "PublicDnsName" ]}, "/wordpress" ]]},
-      "Description" : "Petstore App"
+      "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : [ "WebServer", "PublicDnsName" ]}, ":7979/" ]]},
+      "Description" : "Petstore Frontend App"
     }
   }
 }

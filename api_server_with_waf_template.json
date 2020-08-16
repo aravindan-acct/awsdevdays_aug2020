@@ -77,7 +77,7 @@
     },
     "WAFAWSRegionArch2AMI" : {
       "us-west-2"        : {"HVM64" : "ami-0fcb0e67ba0ebe5dc"},
-      "us-west-1"        : {"HVM64" : "ami-0892ee615afca4c0b"}  
+      "us-west-1"        : {"HVM64" : "ami-0956095ed3768cc50"}  
     }
 
   },
