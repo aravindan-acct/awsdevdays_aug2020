@@ -4,6 +4,16 @@
   "Description" : "AWS CloudFormation Sample Template PetStore_Single_Instance: PetStore is web software you can use to demo an API server with a frontend application. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.",
 
   "Parameters" : {
+    "VPC": {
+      "Description": "VPC for the deployment",
+      "Type": "AWS::EC2::VPC::Id",
+      "ConstraintDescription": "Barracuda WAF VPC" 
+    },
+    "Subnet": {
+      "Description": "Subnet in which the instance should be deployed",
+      "Type": "AWS::EC2::Subnet::Id",
+      "ConstraintDescription": "Must be a valid subnet in the Barracuda WAF VPC"
+    },
 
     "KeyName": {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
@@ -14,7 +24,7 @@
     "InstanceType" : {
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
-      "Default" : "m4.large",
+      "Default" : "t2.medium",
       "AllowedValues" : [ "t2.medium", "m3.large", "m4.large"]
 ,
       "ConstraintDescription" : "must be a valid EC2 instance type."
@@ -73,7 +83,8 @@
     "FrontEndServerSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
-        "GroupDescription" : "Enable HTTP access via port 80 and 8080 locked down to the load balancer + SSH access",
+        "GroupDescription" : "Enable HTTP access via port 7979",
+        "VpcId": {"Ref" : "VPC"},
         "SecurityGroupIngress" : [
           {"IpProtocol" : "tcp", "FromPort" : "7979", "ToPort" : "7979", "CidrIp" : "0.0.0.0/0"},
           {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
@@ -141,8 +152,22 @@
         "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
                           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
         "InstanceType"   : { "Ref" : "InstanceType" },
-        "SecurityGroups" : [ {"Ref" : "FrontEndServerSecurityGroup"} ],
         "KeyName"        : { "Ref" : "KeyName" },
+        
+        "NetworkInterfaces": [
+          {
+              "GroupSet": [
+              {
+                  "Ref": "FrontEndServerSecurityGroup"
+              }
+              ],
+              "DeviceIndex": "0",
+              "DeleteOnTermination": "true",
+              "SubnetId": {
+                  "Ref": "Subnet"
+              }
+          }
+      ],
         "Tags": [
           {   "Key": "Name",
               "Value": "FrontEnd_Server"}],

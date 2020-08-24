@@ -1,0 +1,267 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation Sample Template PetStore_Backend_Single_Instance:
+  PetStore is web software you can use to demo an API server with a frontend application.
+  This template installs PetStore Backend API Server with a local MySQL database
+  for storage. In addition to this, the template also installs a Barracuda WAF instance 
+  which will be used for protecting the Petstore application.
+  **WARNING** This template creates an Amazon EC2 instance. You will
+  be billed for the AWS resources used if you create a stack from this template.'
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: Barracuda WAF 
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Cuda-WAF-igw
+  InternetGatewayAttachment:
+    DependsOn:
+      - InternetGateway
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    DependsOn:
+      - VPC
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Barracuda WAF Public Subnet (AZ1)
+  PublicRouteTable:
+    DependsOn:
+    - VPC
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Barracuda WAF Public Routes
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      #NatGatewayId: !Ref NatGateway
+  PublicSubnet1RouteTableAssociation:
+    DependsOn:
+    - PublicRouteTable
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+    
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt 'EIP.AllocationId'
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: nat-gw  
+  PrivateSubnet1:
+    DependsOn:
+      - VPC
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.0.2.0/24
+      Tags:
+        - Key: Name
+          Value: "PetStore API Server Subnet (AZ1)"
+  PrivateSubnet2:
+    DependsOn:
+      - VPC
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.0.3.0/24
+      Tags:
+        - Key: Name
+          Value: "Petstore Frontend Server Subnet (AZ1)"
+  PrivateRouteTable:
+    DependsOn:
+    - VPC
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: "Petstore private route table"
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+      #NatGatewayId: !Ref NatGateway
+  PrivateSubnet1RouteTableAssociation:
+    DependsOn:
+    - PrivateRouteTable
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    DependsOn:
+    - PrivateRouteTable
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+  
+  BarracudaWAF:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0da33c9cd12d95f2e
+      InstanceType:
+        m4.large #Ref: InstanceType
+      SecurityGroupIds:
+        - Fn::GetAtt:
+          - WafSecurityGroup
+          - GroupId
+      SubnetId: !Ref PublicSubnet1
+      KeyName: lab #ee-default-keypair
+      Tags:
+      - Key: Name
+        Value: Barracuda_WAF
+      
+  
+  WafSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Enable HTTP access via port 8080
+      SecurityGroupIngress:
+      -
+        IpProtocol: tcp
+        FromPort: 8000
+        ToPort: 8000
+        CidrIp: 0.0.0.0/0
+      -
+        IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      -
+        IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIp: 0.0.0.0/0
+      - 
+        IpProtocol: icmp
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 0.0.0.0/0
+  APIServer:
+    Type: AWS::EC2::Instance
+    DependsOn: NatGateway
+    Properties:
+      ImageId: ami-0873b46c45c11058d
+      InstanceType:
+        t3.small #Ref: InstanceType
+      SecurityGroupIds:
+        - Fn::GetAtt:
+          - APIServerSecurityGroup
+          - GroupId
+      SubnetId: !Ref PrivateSubnet1
+      KeyName: lab #ee-default-keypair
+      Tags:
+      - Key: Name
+        Value: API_Server
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n "
+            - "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1 \n"
+            - "sudo yum -y update \n"
+            - "sudo  yum -y install php php-mysql mariadb mariadb-server mariadb-devel mariadb-libs amazon-linux-extras git python3 python2-pip httpd \n"
+            - "sudo systemctl enable mariadb \n"
+            - "sudo systemctl start  mariadb \n"
+            - "sudo mysqladmin -u root password TiUtpgDKlbVJpXpaADrTiSfhkphDznym \n"
+            - "sudo mysql -u root --password=TiUtpgDKlbVJpXpaADrTiSfhkphDznym -e \"quit\" \n"
+            - "sudo mysql -u root --password=TiUtpgDKlbVJpXpaADrTiSfhkphDznym  -e  \"CREATE DATABASE awsdevdays; CREATE USER  'wafdemodbuser'@'localhost' IDENTIFIED BY 'h6d7GEujNYW06idiNG1qaeuemqZWzZyO';  GRANT ALL ON awsdevdays.* TO  wafdemodbuser@localhost; FLUSH PRIVILEGES; \" \n"
+            - "export DBUSER=wafdemodbuser \n"
+            - "export DBPASSWORD=h6d7GEujNYW06idiNG1qaeuemqZWzZyO \n"
+            - "dir=$(pwd) \n"
+            - "git clone https://github.com/aravindan-acct/petstore.git \n"
+            - "cd $dir/petstore/ \n"
+            - "pip3 install --user -r requirements.txt \n"
+            - 'pip3 install --user connexion[swagger-ui]'
+            - "\n"
+            - "cd $dir/petstore/api_server \n"
+            - "python3 -m swagger_server &\n"
+            - "/opt/aws/bin/cfn-signal -e $? "
+            - "         --stack "
+            - Ref: AWS::StackName
+            - "         --resource WebServer "
+            - "         --region "
+            - Ref: AWS::Region
+            - "\n"
+  APIServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Enable HTTP access via port 8080
+      SecurityGroupIngress:
+      -
+        IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIp: 0.0.0.0/0
+      - 
+        IpProtocol: icmp
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 0.0.0.0/0
+
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT15M
+Outputs:
+  WAFUrl:
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - Fn::GetAtt:
+          - BarracudaWAF
+          - PublicDnsName
+        - ":8000/"
+    Description: Barracuda WAF
+  PetstoreURL:
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - Fn::GetAtt:
+          - APIServer
+          - PrivateDnsName
+        - ":8080/api/petstore/1.0.0/ui"
+    Description: Petstore App
