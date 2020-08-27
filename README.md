@@ -2,8 +2,8 @@
 
 ## Introduction
 ## Pre Requisites
-Create a Key Pair and save it locally
-WAF is a PAYG license type instance
+
+The Barracuda WAF used in the lab is a Bring your Own License type instance. 
 ## Getting started
 ## Summary
 
