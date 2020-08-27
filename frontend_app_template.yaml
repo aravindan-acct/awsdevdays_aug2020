@@ -1,0 +1,158 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation Sample Template PetStore_Single_Instance: PetStore
+  is web software you can use to demo an API server with a frontend application. **WARNING**
+  This template creates an Amazon EC2 instance. You will be billed for the AWS resources
+  used if you create a stack from this template.'
+Parameters:
+  StackID:
+    Description: the stack initially created
+    Type: String #AWS::Cloudformation::Stack
+  #VPC:
+  #  Description: VPC for the deployment
+  #  Type: AWS::EC2::VPC::Id
+  #  ConstraintDescription: Barracuda WAF VPC
+  #Subnet:
+  #  Description: Subnet in which the instance should be deployed
+  #  Type: AWS::EC2::Subnet::Id
+  #  ConstraintDescription: Must be a valid subnet in the Barracuda WAF VPC
+  #KeyName:
+  #  Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+  #  Type: AWS::EC2::KeyPair::KeyName
+  #  ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  #InstanceType:
+  #  Description: WebServer EC2 instance type
+  ##  Type: String
+  #  Default: t3.medium
+  #  AllowedValues:
+  #  - t2.medium
+  #  - m3.large
+  #  - m4.large
+  #  ConstraintDescription: must be a valid EC2 instance type.
+  #BarracudaWAFPublicIP:
+  #  Description: System IP of the Barracuda WAF
+  #  Type: String
+  #  MinLength: '9'
+  #  MaxLength: '18'
+  #  AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
+  #  ConstraintDescription: must be a valid IP of the form x.x.x.x
+  #BarracudaWAFPrivateIP:
+  #  Description: System IP of the Barracuda WAF
+  #  Type: String
+  #  MinLength: '9'
+  #  MaxLength: '18'
+  #  AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
+  # ConstraintDescription: must be a valid IP of the form x.x.x.x
+  BarracudaWAFPassword:
+    NoEcho: 'true'
+    Description: BarracudaWAF admin password
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+  #SSHLocation:
+  #  Description: The IP address range that can be used to SSH to the EC2 instances
+  #  Type: String
+  #  MinLength: '9'
+  #  MaxLength: '18'
+  #  Default: 0.0.0.0/0
+  #  AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  #  ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+#Mappings:
+  #AWSInstanceType2Arch:
+  ##  t2.medium:
+  #    Arch: HVM64
+  #  m3.large:
+  #    Arch: HVM64
+  #  m4.large:
+  #    Arch: HVM64
+  #AWSRegionArch2AMI:
+  #  us-west-2:
+  #    HVM64: ami-0873b46c45c11058d
+  #  us-west-1:
+  #    HVM64: ami-05655c267c89566dd
+Resources:
+  FrontEndServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via port 7979
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${StackID}-VPCID"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '7979'
+        ToPort: '7979'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+      #- IpProtocol: tcp
+      #  FromPort: '22'
+      #  ToPort: '22'
+      #  CidrIp:
+      #    Ref: SSHLocation
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0873b46c45c11058d
+      InstanceType: t3.medium
+      KeyName: ee-default-keypair
+        #Ref: KeyName
+      NetworkInterfaces:
+      - GroupSet:
+        - Ref: FrontEndServerSecurityGroup
+        DeviceIndex: '0'
+        DeleteOnTermination: 'true'
+        SubnetId:
+          Fn::ImportValue:
+            !Sub "${StackID}-PrivateSubnet1"
+      Tags:
+      - Key: Name
+        Value: FrontEnd_Server
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n "
+            - "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1 \n"
+            - "sudo yum -y update \n"
+            - "sudo  yum -y install amazon-linux-extras git python3 python2-pip  \n"
+            - "dir=$(pwd) \n"
+            - "export WAFIP="
+            - Fn::ImportValue:
+                !Sub "${StackID}-WAF-Private-IP"
+            - "\n"
+            - "export WAFPASSWORD="
+            - Ref: BarracudaWAFPassword
+            - "\n"
+            - "export WAFPublicIP="
+            - Fn::ImportValue:
+                !Sub "${StackID}-WAF-Public-IP"
+            - "\n"
+            - "git clone https://github.com/aravindan-acct/frontend_UI_app.git \n"
+            - "cd $dir/frontend_UI_app/ \n"
+            - "pip3 install --user -r requirements.txt \n"
+            - "python3 waf_configuration.py \n"
+            - "python3 -m project &\n"
+            - "/opt/aws/bin/cfn-signal -e $? "
+            - "         --stack "
+            - Ref: AWS::StackName
+            - "         --resource WebServer "
+            - "         --region "
+            - Ref: AWS::Region
+            - "\n"
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+Outputs:
+  WebsiteURL:
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - Fn::GetAtt:
+          - WebServer
+          - PublicDnsName
+        - ":7979/"
+    Description: Petstore Frontend App
