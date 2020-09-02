@@ -1,4 +1,3 @@
----
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'AWS CloudFormation Sample Template PetStore_Backend_Single_Instance:
   PetStore is web software you can use to demo an API server with a frontend application.
@@ -30,7 +29,6 @@ Resources:
     Properties:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
-
   PublicSubnet1:
     DependsOn:
       - VPC
@@ -70,8 +68,7 @@ Resources:
   EIP:
     Type: AWS::EC2::EIP
     Properties:
-      Domain: vpc
-    
+      Domain: vpc    
   NatGateway:
     Type: AWS::EC2::NatGateway
     Properties:
@@ -91,17 +88,7 @@ Resources:
       Tags:
         - Key: Name
           Value: "PetStore API Server Subnet (AZ1)"
-  PrivateSubnet2:
-    DependsOn:
-      - VPC
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: 10.0.3.0/24
-      Tags:
-        - Key: Name
-          Value: "Petstore Frontend Server Subnet (AZ1)"
+
   PrivateRouteTable:
     DependsOn:
     - VPC
@@ -125,27 +112,17 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnet1
-
-  PrivateSubnet2RouteTableAssociation:
-    DependsOn:
-    - PrivateRouteTable
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      SubnetId: !Ref PrivateSubnet2
-  
   BarracudaWAF:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: ami-0da33c9cd12d95f2e
-      InstanceType:
-        m4.large #Ref: InstanceType
+      ImageId: ami-0f93e7669b09631fe #ami-368d3b4e
+      InstanceType: m4.large #Ref: InstanceType
       SecurityGroupIds:
         - Fn::GetAtt:
           - WafSecurityGroup
           - GroupId
       SubnetId: !Ref PublicSubnet1
-      KeyName: lab #ee-default-keypair
+      KeyName: ee-default-keypair
       Tags:
       - Key: Name
         Value: Barracuda_WAF
@@ -189,7 +166,7 @@ Resources:
           - APIServerSecurityGroup
           - GroupId
       SubnetId: !Ref PrivateSubnet1
-      KeyName: lab #ee-default-keypair
+      KeyName: ee-default-keypair
       Tags:
       - Key: Name
         Value: API_Server
@@ -265,3 +242,23 @@ Outputs:
           - PrivateDnsName
         - ":8080/api/petstore/1.0.0/ui"
     Description: Petstore App
+  WAFPublicIP:
+    Description: Public IP of the WAF
+    Value: !GetAtt BarracudaWAF.PublicIp
+    Export:
+      Name: !Sub "${AWS::StackName}-WAF-Public-IP"
+  WAFPrivateIP:
+    Description: Private IP of the WAF
+    Value: !GetAtt BarracudaWAF.PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}-WAF-Private-IP"
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  PrivateSubnet1:
+    Description: A list of the private subnets
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1"
