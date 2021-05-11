@@ -192,7 +192,7 @@ Resources:
             - 'pip3 install --user connexion[swagger-ui]'
             - "\n"
             - "cd $dir/petstore/api_server \n"
-            - "python3 -m swagger_server &\n"
+            - "nohup python3 -m swagger_server &\n"
             - "/opt/aws/bin/cfn-signal -e $? "
             - "         --stack "
             - Ref: AWS::StackName

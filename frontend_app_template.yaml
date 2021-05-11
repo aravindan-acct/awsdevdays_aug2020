@@ -134,7 +134,7 @@ Resources:
             - "cd $dir/frontend_UI_app/ \n"
             - "pip3 install --user -r requirements.txt \n"
             - "python3 waf_configuration.py \n"
-            - "python3 -m project &\n"
+            - "nohup python3 -m project &\n"
             - "/opt/aws/bin/cfn-signal -e $? "
             - "         --stack "
             - Ref: AWS::StackName
